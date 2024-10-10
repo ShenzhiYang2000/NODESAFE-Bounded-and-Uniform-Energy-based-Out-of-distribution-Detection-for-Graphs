@@ -7,9 +7,9 @@ import torch.nn.functional as F
 
 
 class UB_loss(nn.Module):
-    def __init__(self, margin=0.01):
+    def __init__(self, lamda1=0.999):
         super(UB_loss, self).__init__()
-        self.margin = margin
+        self.lamda1 = lamda1
 
     def forward(self, _features, labels=None, _features_out=None, epoch=None):
 
@@ -32,17 +32,16 @@ class UB_loss(nn.Module):
             Sum_mean_out = torch.abs(torch.mean(Sum_out)).detach_()
             Sum_var_out = torch.var(Sum_out)
 
-        alpha = 0.999
 
         if _features_out is not None:
             if epoch > 120:
-                modulus_loss = alpha * modulus_var / modulus_mean  + (1-alpha) * Sum_var / Sum_mean + (1-alpha) * Sum_var_out / Sum_mean_out
+                modulus_loss = self.lamda1 * modulus_var / modulus_mean  + (1-self.lamda1) * Sum_var / Sum_mean + (1-self.lamda1) * Sum_var_out / Sum_mean_out
             else:
-                modulus_loss = alpha * modulus_var / modulus_mean  
+                modulus_loss = self.lamda1 * modulus_var / modulus_mean  
 
         else:
-            if epoch > 50:
-                modulus_loss = alpha * modulus_var / modulus_mean + (1-alpha) * Sum_var / Sum_mean 
+            if epoch > 20:
+                modulus_loss = self.lamda1 * modulus_var / modulus_mean + (1-self.lamda1) * Sum_var / Sum_mean 
 
             else:
                 modulus_loss = 0
