@@ -6,6 +6,9 @@ from torch_geometric.utils import degree
 from backbone import *
 import numpy as np
 
+
+
+
 class NODESafe(nn.Module):
     def __init__(self, d, c, args):
         super(NODESafe, self).__init__()
@@ -39,7 +42,7 @@ class NODESafe(nn.Module):
         x, edge_index = dataset.x.to(device), dataset.edge_index.to(device)
         return self.encoder(x, edge_index)
 
-    def propagation(self, e, edge_index, prop_layers=1, alpha=0.5):
+    def propagation(self, e, edge_index, prop_layers=1, eta=0.5):
         '''energy belief propagation, return the energy after propagation'''
         e = e.unsqueeze(1)
         N = e.shape[0]
@@ -50,7 +53,7 @@ class NODESafe(nn.Module):
         value = torch.nan_to_num(value, nan=0.0, posinf=0.0, neginf=0.0)
         adj = SparseTensor(row=col, col=row, value=value, sparse_sizes=(N, N))
         for _ in range(prop_layers):
-            e = e * alpha + matmul(adj, e) * (1 - alpha)
+            e = e * eta + matmul(adj, e) * (1 - eta)
         return e.squeeze(1)
 
     def detect(self, dataset, node_idx, device, args):
@@ -64,7 +67,7 @@ class NODESafe(nn.Module):
         else: # for single-label multi-class classification
             neg_energy = args.T * torch.logsumexp(logits / args.T, dim=-1)
         if args.use_prop: # use energy belief propagation
-            neg_energy = self.propagation(neg_energy, edge_index, args.K, args.alpha)
+            neg_energy = self.propagation(neg_energy, edge_index, args.K, args.eta)
         return neg_energy[node_idx]
 
     def loss_compute(self, dataset_ind, dataset_ood, criterion, device, args, m_criterion = None, sc_criterion = None, epoch=None):
@@ -96,8 +99,8 @@ class NODESafe(nn.Module):
                 energy_out = - args.T * torch.logsumexp(logits_out / args.T, dim=-1)
 
             if args.use_prop: # use energy belief propagation
-                energy_in = self.propagation(energy_in, edge_index_in, args.K, args.alpha)[train_in_idx]
-                energy_out = self.propagation(energy_out, edge_index_out, args.K, args.alpha)[train_ood_idx]
+                energy_in = self.propagation(energy_in, edge_index_in, args.K, args.eta)[train_in_idx]
+                energy_out = self.propagation(energy_out, edge_index_out, args.K, args.eta)[train_ood_idx]
             else:
                 energy_in = energy_in[train_in_idx]
                 energy_out = energy_out[train_ood_idx]
